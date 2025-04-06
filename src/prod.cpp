@@ -8,21 +8,38 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <boost/program_options.hpp>
 
 #include "payload.h"
 
-void print_usage(const char* program_name) {
-    std::cerr << "Usage: " << program_name << " <socket_path> <frequency_hz>\n";
-}
+namespace po = boost::program_options;
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        print_usage(argv[0]);
+    std::string socket_path;
+    int frequency_hz;
+
+    try {
+        po::options_description desc("Allowed options");
+        desc.add_options()
+            ("help", "produce help message")
+            ("socket-path,s", po::value<std::string>(&socket_path)->required(), "socket path")
+            ("frequency-hz,f", po::value<int>(&frequency_hz)->required(), "frequency in Hz")
+        ;
+
+        po::variables_map vm;
+        po::store(po::parse_command_line(argc, argv, desc), vm);
+
+        if (vm.count("help")) {
+            std::cout << desc << "\n";
+            return EXIT_SUCCESS;
+        }
+
+        po::notify(vm);
+    } catch (const po::error& ex) {
+        std::cerr << "Error: " << ex.what() << "\n";
         return EXIT_FAILURE;
     }
 
-    const char* socket_path = argv[1];
-    int frequency_hz = std::stoi(argv[2]);
     int interval_ms = 1000 / frequency_hz;
 
     int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -33,7 +50,7 @@ int main(int argc, char* argv[]) {
 
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
-    std::strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+    std::strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
 
     std::random_device rd;
     std::mt19937 gen(rd());

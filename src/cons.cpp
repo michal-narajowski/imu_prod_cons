@@ -5,20 +5,35 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <linux/in.h>
+#include <boost/program_options.hpp>
 
 #include "payload.h"
 
-void print_usage(const char* program_name) {
-    std::cerr << "Usage: " << program_name << " <socket_path>\n";
-}
+namespace po = boost::program_options;
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        print_usage(argv[0]);
+    std::string socket_path;
+
+    try {
+        po::options_description desc("Allowed options");
+        desc.add_options()
+            ("help", "produce help message")
+            ("socket-path,s", po::value<std::string>(&socket_path)->required(), "socket path")
+        ;
+
+        po::variables_map vm;
+        po::store(po::parse_command_line(argc, argv, desc), vm);
+
+        if (vm.count("help")) {
+            std::cout << desc << "\n";
+            return EXIT_SUCCESS;
+        }
+
+        po::notify(vm);
+    } catch (const po::error& ex) {
+        std::cerr << "Error: " << ex.what() << "\n";
         return EXIT_FAILURE;
     }
-
-    const char* socket_path = argv[1];
 
     int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sockfd == -1) {
@@ -28,9 +43,9 @@ int main(int argc, char* argv[]) {
 
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
-    std::strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+    std::strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
 
-    unlink(socket_path);
+    unlink(socket_path.c_str());
 
     if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("bind");

@@ -8,7 +8,7 @@
 #include <boost/program_options.hpp>
 #include <poll.h>
 
-#include "payload.h"
+#include "imu_data.h"
 #include "log_utils.h"
 
 namespace po = boost::program_options;
@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    Payload_IMU_t packet;
+    ImuData_t packet;
     socklen_t addr_len = sizeof(addr);
 
     while (true) {
@@ -94,10 +94,7 @@ int main(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
 
-            BOOST_LOG_TRIVIAL(debug) << "Received packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
-                      << ", tsAcc=" << packet.timestampAcc << ", xGyro=" << packet.xGyro << ", yGyro=" << packet.yGyro
-                      << ", zGyro=" << packet.zGyro << ", tsGyro=" << packet.timestampGyro << ", xMag=" << packet.xMag
-                      << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag;
+            BOOST_LOG_TRIVIAL(debug) << "Received packet: " << packet.to_string();
         }
     }
 

@@ -11,15 +11,22 @@
 #include <boost/program_options.hpp>
 
 #include "log_utils.h"
-#include "payload.h"
+#include "imu_data.h"
+#include "random_imu_data.h"
+#include "csv_imu_data.h"
+#include "imu_data_factory.h"
+#include "concrete_imu_data_factory.h"
 
 namespace po = boost::program_options;
 namespace logging = boost::log;
+namespace keywords = boost::log::keywords;
 
 int main(int argc, char* argv[]) {
     std::string socket_path;
     int frequency_hz;
     std::string log_level_string = "info";
+    std::string data_source = "random"; // Default data source
+    std::string csv_file_path;
 
     try {
         po::options_description desc("Allowed options");
@@ -28,18 +35,26 @@ int main(int argc, char* argv[]) {
             ("socket-path,s", po::value<std::string>(&socket_path)->required(), "socket path")
             ("frequency-hz,f", po::value<int>(&frequency_hz)->required(), "frequency in Hz")
             ("log-level,l", po::value<std::string>(&log_level_string), "log level (trace, debug, info, warning, error, fatal)")
+            ("data-source,d", po::value<std::string>(&data_source)->default_value("random"), "Data source (random or csv)")
+            ("csv-file,c", po::value<std::string>(&csv_file_path), "CSV file path")
         ;
 
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
+        po::notify(vm);
 
         if (vm.count("help")) {
             std::cout << desc << "\n";
             return EXIT_SUCCESS;
         }
 
-        po::notify(vm);
+        if (data_source == "csv" && !vm.count("csv-file")) {
+            throw std::runtime_error("CSV file path must be specified when using CSV data source.");
+        }
     } catch (const po::error& ex) {
+        std::cerr << "Error: " << ex.what() << "\n";
+        return EXIT_FAILURE;
+    }  catch (const std::runtime_error& ex) {
         std::cerr << "Error: " << ex.what() << "\n";
         return EXIT_FAILURE;
     }
@@ -66,26 +81,27 @@ int main(int argc, char* argv[]) {
     addr.sun_family = AF_UNIX;
     std::strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dist_float(-100.0f, 100.0f);
-    std::uniform_int_distribution<int32_t> dist_int(-100, 100);
-    std::uniform_int_distribution<uint32_t> dist_uint(0, 1000);
+    ConcreteImuDataFactory factory;
+    std::unique_ptr<IImuDataProvider> data_provider = nullptr;
+    std::random_device random_device;
+
+    if (data_source == "random") {
+        data_provider = factory.create_random_imu_data(random_device());
+    } else if (data_source == "csv") {
+        data_provider = factory.create_csv_imu_data(csv_file_path);
+    } else {
+        std::cerr << "Error: Invalid data source specified." << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (!data_provider->initialize()) {
+        std::cerr << "Error: Failed to initialize data provider." << std::endl;
+        close(sockfd);
+        return EXIT_FAILURE;
+    }
 
     while (true) {
-        Payload_IMU_t packet;
-        packet.xAcc = dist_float(gen);
-        packet.yAcc = dist_float(gen);
-        packet.zAcc = dist_float(gen);
-        packet.timestampAcc = dist_uint(gen);
-        packet.xGyro = dist_int(gen);
-        packet.yGyro = dist_int(gen);
-        packet.zGyro = dist_int(gen);
-        packet.timestampGyro = dist_uint(gen);
-        packet.xMag = dist_float(gen);
-        packet.yMag = dist_float(gen);
-        packet.zMag = dist_float(gen);
-        packet.timestampMag = dist_uint(gen);
+        ImuData_t packet = data_provider->get_next();
 
         if (sendto(sockfd, &packet, sizeof(packet), 0, (sockaddr*)&addr, sizeof(addr)) == -1) {
             perror("sendto");
@@ -93,10 +109,7 @@ int main(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 
-        BOOST_LOG_TRIVIAL(debug) << "Sent packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
-                  << ", tsAcc=" << packet.timestampAcc << ", xGyro=" << packet.xGyro << ", yGyro=" << packet.yGyro
-                  << ", zGyro=" << packet.zGyro << ", tsGyro=" << packet.timestampGyro << ", xMag=" << packet.xMag
-                  << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag;
+        BOOST_LOG_TRIVIAL(debug) << "Sent packet: " << packet.to_string();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
     }

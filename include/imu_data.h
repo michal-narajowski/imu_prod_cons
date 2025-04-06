@@ -1,7 +1,10 @@
-#include <cstdint>
+#ifndef IMU_DATA_H
+#define IMU_DATA_H
 
-typedef struct
-{
+#include <cstdint>
+#include <sstream>
+
+typedef struct {
     float xAcc;        // Acceleration [mg, g=9.81]
     float yAcc;        // Acceleration [mg, g=9.81]
     float zAcc;        // Acceleration [mg, g=9.81]
@@ -14,4 +17,15 @@ typedef struct
     float yMag;        // Magnetic induction y axis [mGauss]
     float zMag;        // Magnetic induction z axis [mGauss]
     uint32_t timestampMag; // Time stamp of magnetometer measurement
-} __attribute__((packed)) Payload_IMU_t;
+
+    std::string to_string() const {
+        std::stringstream ss;
+        ss << "xAcc: " << xAcc << ", yAcc: " << yAcc << ", zAcc: " << zAcc
+                  << ", tsAcc: " << timestampAcc << ", xGyro: " << xGyro << ", yGyro: " << yGyro
+                  << ", zGyro: " << zGyro << ", tsGyro: " << timestampGyro << ", xMag=" << xMag
+                  << ", yMag=" << yMag << ", zMag=" << zMag << ", tsMag=" << timestampMag << std::endl;
+        return ss.str();
+    }
+} __attribute__((packed)) ImuData_t;
+
+#endif // IMU_DATA_H

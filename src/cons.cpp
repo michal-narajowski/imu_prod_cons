@@ -20,7 +20,17 @@ namespace po = boost::program_options;
 namespace logging = boost::log;
 namespace keywords = boost::log::keywords;
 
-void init_logging() {
+logging::trivial::severity_level parse_log_level(const std::string& level) {
+    if (level == "trace") return logging::trivial::trace;
+    if (level == "debug") return logging::trivial::debug;
+    if (level == "info") return logging::trivial::info;
+    if (level == "warning") return logging::trivial::warning;
+    if (level == "error") return logging::trivial::error;
+    if (level == "fatal") return logging::trivial::fatal;
+    throw std::runtime_error("Invalid log level: " + level);
+}
+
+void init_logging(logging::trivial::severity_level level) {
     logging::add_file_log(
         keywords::file_name = "consumer_%N.log",
         keywords::rotation_size = 10 * 1024 * 1024,
@@ -33,21 +43,22 @@ void init_logging() {
     );
 
     logging::core::get()->set_filter(
-        logging::trivial::severity >= logging::trivial::info
+        logging::trivial::severity >= level
     );
+
     logging::add_common_attributes();
 }
 
 int main(int argc, char* argv[]) {
-    init_logging();
-
     std::string socket_path;
+    std::string log_level_string = "info";
 
     try {
         po::options_description desc("Allowed options");
         desc.add_options()
             ("help", "produce help message")
             ("socket-path,s", po::value<std::string>(&socket_path)->required(), "socket path")
+            ("log-level,l", po::value<std::string>(&log_level_string), "log level (trace, debug, info, warning, error, fatal)")
         ;
 
         po::variables_map vm;
@@ -63,6 +74,16 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error: " << ex.what() << "\n";
         return EXIT_FAILURE;
     }
+
+    logging::trivial::severity_level log_level;
+    try {
+        log_level = parse_log_level(log_level_string);
+    } catch (const std::runtime_error& ex) {
+        std::cerr << "Error: " << ex.what() << "\n";
+        return EXIT_FAILURE;
+    }
+
+    init_logging(log_level);
 
     int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sockfd == -1) {
@@ -93,7 +114,7 @@ int main(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 
-        BOOST_LOG_TRIVIAL(info) << "Received packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
+        BOOST_LOG_TRIVIAL(debug) << "Received packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
                   << ", tsAcc=" << packet.timestampAcc << ", xGyro=" << packet.xGyro << ", yGyro=" << packet.yGyro
                   << ", zGyro=" << packet.zGyro << ", tsGyro=" << packet.timestampGyro << ", xMag=" << packet.xMag
                   << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag;

@@ -9,14 +9,10 @@
 #include <thread>
 #include <random>
 
-struct __attribute__((packed)) DataPacket {
-    float x;
-    float y;
-    float z;
-};
+#include "payload.h"
 
 void print_usage(const char* program_name) {
-    std::cerr << "Usage: " << program_name << " <socket_path> <interval_ms>\n";
+    std::cerr << "Usage: " << program_name << " <socket_path> <frequency_hz>\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -26,7 +22,8 @@ int main(int argc, char* argv[]) {
     }
 
     const char* socket_path = argv[1];
-    int interval_ms = std::stoi(argv[2]);
+    int frequency_hz = std::stoi(argv[2]);
+    int interval_ms = 1000 / frequency_hz;
 
     int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sockfd == -1) {
@@ -38,20 +35,26 @@ int main(int argc, char* argv[]) {
     addr.sun_family = AF_UNIX;
     std::strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
-    unlink(socket_path);
-
-    if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        perror("bind");
-        close(sockfd);
-        return EXIT_FAILURE;
-    }
-
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dist(-100.0f, 100.0f);
+    std::uniform_real_distribution<float> dist_float(-100.0f, 100.0f);
+    std::uniform_int_distribution<int32_t> dist_int(-100, 100);
+    std::uniform_int_distribution<uint32_t> dist_uint(0, 1000);
 
     while (true) {
-        DataPacket packet{dist(gen), dist(gen), dist(gen)};
+        Payload_IMU_t packet;
+        packet.xAcc = dist_float(gen);
+        packet.yAcc = dist_float(gen);
+        packet.zAcc = dist_float(gen);
+        packet.timestampAcc = dist_uint(gen);
+        packet.xGyro = dist_int(gen);
+        packet.yGyro = dist_int(gen);
+        packet.zGyro = dist_int(gen);
+        packet.timestampGyro = dist_uint(gen);
+        packet.xMag = dist_float(gen);
+        packet.yMag = dist_float(gen);
+        packet.zMag = dist_float(gen);
+        packet.timestampMag = dist_uint(gen);
 
         if (sendto(sockfd, &packet, sizeof(packet), 0, (sockaddr*)&addr, sizeof(addr)) == -1) {
             perror("sendto");
@@ -59,7 +62,10 @@ int main(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 
-        std::cout << "Sent packet: x=" << packet.x << ", y=" << packet.y << ", z=" << packet.z << "\n";
+        std::cout << "Sent packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
+                  << ", tsAcc=" << packet.timestampAcc << ", xGyro=" << packet.xGyro << ", yGyro=" << packet.yGyro
+                  << ", zGyro=" << packet.zGyro << ", tsGyro=" << packet.timestampGyro << ", xMag=" << packet.xMag
+                  << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag << "\n";
 
         std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
     }

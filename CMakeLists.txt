@@ -10,8 +10,8 @@ find_package(Boost 1.83.0 COMPONENTS program_options log log_setup REQUIRED)
 include_directories(include)
 include_directories(${Boost_INCLUDE_DIRS}) 
 
-add_executable(producer src/prod.cpp)
-add_executable(consumer src/cons.cpp)
+add_executable(producer src/prod.cpp src/log_utils.cpp)
+add_executable(consumer src/cons.cpp src/log_utils.cpp)
 
 target_link_libraries(producer ${Boost_LIBRARIES})
 target_link_libraries(consumer ${Boost_LIBRARIES})

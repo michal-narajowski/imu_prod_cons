@@ -6,6 +6,7 @@
 #include <sys/un.h>
 #include <linux/in.h>
 #include <boost/program_options.hpp>
+#include <poll.h>
 
 #include "payload.h"
 #include "log_utils.h"
@@ -16,6 +17,7 @@ namespace logging = boost::log;
 int main(int argc, char* argv[]) {
     std::string socket_path;
     std::string log_level_string = "info";
+    int timeout_ms = 1000;
 
     try {
         po::options_description desc("Allowed options");
@@ -23,6 +25,7 @@ int main(int argc, char* argv[]) {
             ("help", "produce help message")
             ("socket-path,s", po::value<std::string>(&socket_path)->required(), "socket path")
             ("log-level,l", po::value<std::string>(&log_level_string), "log level (trace, debug, info, warning, error, fatal)")
+            ("timeout,t", po::value<int>(&timeout_ms), "timeout in milliseconds")
         ;
 
         po::variables_map vm;
@@ -71,17 +74,31 @@ int main(int argc, char* argv[]) {
     socklen_t addr_len = sizeof(addr);
 
     while (true) {
-        ssize_t bytes_received = recvfrom(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&addr, &addr_len);
-        if (bytes_received == -1) {
-            perror("recvfrom");
+        pollfd pfd = {sockfd, POLLIN, 0};
+        int ret = poll(&pfd, 1, timeout_ms);
+
+        if (ret == -1) {
+            perror("poll");
             close(sockfd);
             return EXIT_FAILURE;
+        } else if (ret == 0) {
+            BOOST_LOG_TRIVIAL(warning) << "Timeout waiting for data";
+            continue;
         }
 
-        BOOST_LOG_TRIVIAL(debug) << "Received packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
-                  << ", tsAcc=" << packet.timestampAcc << ", xGyro=" << packet.xGyro << ", yGyro=" << packet.yGyro
-                  << ", zGyro=" << packet.zGyro << ", tsGyro=" << packet.timestampGyro << ", xMag=" << packet.xMag
-                  << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag;
+        if (pfd.revents & POLLIN) {
+            ssize_t bytes_received = recvfrom(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&addr, &addr_len);
+            if (bytes_received == -1) {
+                perror("recvfrom");
+                close(sockfd);
+                return EXIT_FAILURE;
+            }
+
+            BOOST_LOG_TRIVIAL(debug) << "Received packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
+                      << ", tsAcc=" << packet.timestampAcc << ", xGyro=" << packet.xGyro << ", yGyro=" << packet.yGyro
+                      << ", zGyro=" << packet.zGyro << ", tsGyro=" << packet.timestampGyro << ", xMag=" << packet.xMag
+                      << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag;
+        }
     }
 
     close(sockfd);

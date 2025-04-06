@@ -6,12 +6,41 @@
 #include <sys/un.h>
 #include <linux/in.h>
 #include <boost/program_options.hpp>
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/file.hpp>
+#include <boost/log/utility/setup/console.hpp>
+#include <boost/log/attributes/scoped_attribute.hpp>
 
 #include "payload.h"
 
 namespace po = boost::program_options;
+namespace logging = boost::log;
+namespace keywords = boost::log::keywords;
+
+void init_logging() {
+    logging::add_file_log(
+        keywords::file_name = "consumer_%N.log",
+        keywords::rotation_size = 10 * 1024 * 1024,
+        keywords::format = "[%TimeStamp%][%Severity%] %Message%"
+    );
+
+    logging::add_console_log(
+        std::cout,
+        keywords::format = "[%TimeStamp%][%Severity%] %Message%"
+    );
+
+    logging::core::get()->set_filter(
+        logging::trivial::severity >= logging::trivial::info
+    );
+    logging::add_common_attributes();
+}
 
 int main(int argc, char* argv[]) {
+    init_logging();
+
     std::string socket_path;
 
     try {
@@ -64,10 +93,10 @@ int main(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 
-        std::cout << "Received packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
+        BOOST_LOG_TRIVIAL(info) << "Received packet: xAcc=" << packet.xAcc << ", yAcc=" << packet.yAcc << ", zAcc=" << packet.zAcc
                   << ", tsAcc=" << packet.timestampAcc << ", xGyro=" << packet.xGyro << ", yGyro=" << packet.yGyro
                   << ", zGyro=" << packet.zGyro << ", tsGyro=" << packet.timestampGyro << ", xMag=" << packet.xMag
-                  << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag << "\n";
+                  << ", yMag=" << packet.yMag << ", zMag=" << packet.zMag << ", tsMag=" << packet.timestampMag;
     }
 
     close(sockfd);

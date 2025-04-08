@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
 
     int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sockfd == -1) {
-        perror("socket");
+        BOOST_LOG_TRIVIAL(error) << "Failed to create a socket: " << strerror(errno); 
         return EXIT_FAILURE;
     }
 
@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
     unlink(socket_path.c_str());
 
     if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        perror("bind");
+        BOOST_LOG_TRIVIAL(error) << "Failed to bind: " << strerror(errno); 
         close(sockfd);
         return EXIT_FAILURE;
     }
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         int ret = poll(&pfd, 1, timeout_ms);
 
         if (ret == -1) {
-            perror("poll");
+            BOOST_LOG_TRIVIAL(error) << "Failed to poll: " << strerror(errno); 
             close(sockfd);
             return EXIT_FAILURE;
         } else if (ret == 0) {
@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
         if (pfd.revents & POLLIN) {
             ssize_t bytes_received = recvfrom(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&addr, &addr_len);
             if (bytes_received == -1) {
-                perror("recvfrom");
+                BOOST_LOG_TRIVIAL(error) << "Failed to receive data: " << strerror(errno); 
                 close(sockfd);
                 return EXIT_FAILURE;
             }

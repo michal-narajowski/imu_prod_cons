@@ -28,7 +28,7 @@ public:
 
     ImuData_t get_next() override {
         if (data_index >= imu_data_vector.size()) {
-            data_index = 0; // Loop back to the beginning
+            data_index = 0;
         }
         return imu_data_vector[data_index++];
     }
@@ -42,7 +42,6 @@ private:
         std::ifstream file(file_path);
         std::string line;
 
-        // Skip header line
         std::getline(file, line);
 
         while (std::getline(file, line)) {
@@ -58,7 +57,7 @@ private:
             }
             const float g = 9.81f;
             const float ms2_to_mg = 1000.0f / g;
-            const float rads_to_degs = 180.0f / M_PI;
+            const float rads_to_mdegs = 180000.0f / M_PI;
             const float utesla_to_mgauss = 10.0f;
             std::string line_number_info = " at line: " + std::to_string(imu_data_vector.size() + 2);
 
@@ -87,19 +86,19 @@ private:
             }
 
             try {
-                imu_data.xGyro = static_cast<int32_t>(round(std::stof(tokens[5]) * rads_to_degs));
+                imu_data.xGyro = static_cast<int32_t>(round(std::stof(tokens[5]) * rads_to_mdegs));
             } catch (...) {
                 throw std::runtime_error("Invalid value for xGyro: " + tokens[5] + line_number_info);
             }
 
             try {
-                imu_data.yGyro = static_cast<int32_t>(round(std::stof(tokens[6]) * rads_to_degs));
+                imu_data.yGyro = static_cast<int32_t>(round(std::stof(tokens[6]) * rads_to_mdegs));
             } catch (...) {
                 throw std::runtime_error("Invalid value for yGyro: " + tokens[6] + line_number_info);
             }
 
             try {
-                imu_data.zGyro = static_cast<int32_t>(round(std::stof(tokens[7]) * rads_to_degs));
+                imu_data.zGyro = static_cast<int32_t>(round(std::stof(tokens[7]) * rads_to_mdegs));
             } catch (...) {
                 throw std::runtime_error("Invalid value for zGyro: " + tokens[7] + line_number_info);
             }

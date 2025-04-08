@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
@@ -7,6 +8,7 @@
 #include <linux/in.h>
 #include <boost/program_options.hpp>
 #include <poll.h>
+#include "Fusion.h"
 
 #include "imu_data.h"
 #include "log_utils.h"
@@ -73,6 +75,10 @@ int main(int argc, char* argv[]) {
     ImuData_t packet;
     socklen_t addr_len = sizeof(addr);
 
+    uint32_t last_ts = 0;
+    FusionAhrs ahrs;
+    FusionAhrsInitialise(&ahrs);
+
     while (true) {
         pollfd pfd = {sockfd, POLLIN, 0};
         int ret = poll(&pfd, 1, timeout_ms);
@@ -85,7 +91,7 @@ int main(int argc, char* argv[]) {
             BOOST_LOG_TRIVIAL(warning) << "Timeout waiting for data";
             continue;
         }
-
+        
         if (pfd.revents & POLLIN) {
             ssize_t bytes_received = recvfrom(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&addr, &addr_len);
             if (bytes_received == -1) {
@@ -95,6 +101,19 @@ int main(int argc, char* argv[]) {
             }
 
             BOOST_LOG_TRIVIAL(debug) << "Received packet: " << packet.to_string();
+            const FusionVector gyroscope = {static_cast<float>(packet.xGyro) / 1000.0f, static_cast<float>(packet.yGyro) / 1000.0f, static_cast<float>(packet.zGyro) / 1000.0f};
+            const FusionVector accelerometer = {static_cast<float>(packet.xAcc) / 1000.0f, static_cast<float>(packet.yAcc) / 1000.0f, static_cast<float>(packet.zAcc) / 1000.0f};
+            const FusionVector magnetometer = {static_cast<float>(packet.xMag) / 1000.0f, static_cast<float>(packet.yMag) / 1000.0f, static_cast<float>(packet.zMag) / 1000.0f};
+
+            auto mean_timestamp = (packet.timestampMag + packet.timestampGyro + packet.timestampAcc) / 3;
+            auto delta_ts = mean_timestamp - last_ts;
+            last_ts = mean_timestamp;
+            float delta_time = static_cast<float>(delta_ts) / 10e9f;
+
+            FusionAhrsUpdate(&ahrs, gyroscope, accelerometer, magnetometer, delta_time);
+            const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+            BOOST_LOG_TRIVIAL(info) << std::fixed << std::setprecision(1) << "Roll " <<  euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw" << euler.angle.yaw;
+
         }
     }
 

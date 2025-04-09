@@ -5,7 +5,7 @@ project(imu_prod_cons)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Boost 1.83.0 COMPONENTS program_options log log_setup REQUIRED)
+find_package(Boost CONFIG 1.83.0 COMPONENTS program_options log log_setup REQUIRED)
 add_subdirectory("Fusion/Fusion")
 
 include_directories(include)

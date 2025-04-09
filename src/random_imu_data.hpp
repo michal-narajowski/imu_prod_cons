@@ -1,10 +1,8 @@
-#ifndef RANDOM_IMU_DATA_H
-#define RANDOM_IMU_DATA_H
-
+#pragma once
 #include <random>
 
-#include "imu_data.h"
-#include "imu_data_provider.h"
+#include "imu_data.hpp"
+#include "imu_data_provider.hpp"
 
 class RandomImuData : public IImuDataProvider {
 public:
@@ -42,5 +40,3 @@ private:
     std::uniform_int_distribution<int32_t> dist_int;
     std::uniform_int_distribution<uint32_t> dist_uint;
 };
-
-#endif // RANDOM_IMU_DATA_H

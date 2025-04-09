@@ -1,6 +1,4 @@
-#ifndef IMU_DATA_H
-#define IMU_DATA_H
-
+#pragma once
 #include <cstdint>
 #include <sstream>
 
@@ -27,5 +25,3 @@ typedef struct {
         return ss.str();
     }
 } __attribute__((packed)) ImuData_t;
-
-#endif // IMU_DATA_H

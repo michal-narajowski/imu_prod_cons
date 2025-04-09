@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
 
     int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sockfd == -1) {
-        perror("socket");
+        BOOST_LOG_TRIVIAL(error) << "Failed to create socket: " << strerror(errno);
         return EXIT_FAILURE;
     }
 
@@ -90,12 +90,12 @@ int main(int argc, char* argv[]) {
     } else if (data_source == "csv") {
         data_provider = factory.create_csv_imu_data(csv_file_path);
     } else {
-        std::cerr << "Error: Invalid data source specified." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Error: Invalid data source specified.";
         return EXIT_FAILURE;
     }
 
     if (!data_provider->initialize()) {
-        std::cerr << "Error: Failed to initialize data provider." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Error: Failed to initialize data provider.";
         close(sockfd);
         return EXIT_FAILURE;
     }
@@ -104,13 +104,12 @@ int main(int argc, char* argv[]) {
         ImuData_t packet = data_provider->get_next();
 
         if (sendto(sockfd, &packet, sizeof(packet), 0, (sockaddr*)&addr, sizeof(addr)) == -1) {
-            perror("sendto");
+            BOOST_LOG_TRIVIAL(error) << "Failed to send data: " << strerror(errno);
             close(sockfd);
             return EXIT_FAILURE;
         }
 
         BOOST_LOG_TRIVIAL(debug) << "Sent packet: " << packet.to_string();
-
         std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
     }
 

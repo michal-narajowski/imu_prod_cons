@@ -4,6 +4,7 @@
 #include "log_utils.hpp"
 #include "concrete_imu_data_factory.hpp"
 #include "producer.hpp"
+#include "rt_utils.hpp"
 
 namespace po = boost::program_options;
 namespace logging = boost::log;
@@ -14,7 +15,8 @@ void parse_command_line_options(int argc, char* argv[],
                               int& frequency_hz,
                               std::string& log_level_string,
                               std::string& data_source,
-                              std::string& csv_file_path) {
+                              std::string& csv_file_path,
+                              bool& enable_rt) {
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "produce help message")
@@ -27,7 +29,9 @@ void parse_command_line_options(int argc, char* argv[],
         ("data-source,d", po::value<std::string>(&data_source)->default_value("random"), 
          "Data source (random or csv)")
         ("csv-file,c", po::value<std::string>(&csv_file_path), 
-         "CSV file path");
+         "CSV file path")
+        ("enable-rt,r", po::bool_switch(&enable_rt)->default_value(false),
+         "enable real-time scheduling");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -50,13 +54,20 @@ int main(int argc, char* argv[]) {
     std::string log_level_string = "info";
     std::string data_source = "random";
     std::string csv_file_path;
+    bool enable_rt = false;
 
     try {
         parse_command_line_options(argc, argv, socket_path, frequency_hz, 
-                                 log_level_string, data_source, csv_file_path);
+                                 log_level_string, data_source, csv_file_path, enable_rt);
         
         auto log_level = parse_log_level(log_level_string);
         init_logging(log_level);
+
+        if (enable_rt) {
+            BOOST_LOG_TRIVIAL(info) << "Enabling RT scheduling";
+            RtUtils::verify_rt_privileges();
+            RtUtils::set_rt_priority(80);
+        }
 
         auto socket_sender = std::make_unique<SocketSender>(socket_path);
         if (!socket_sender->initialize()) {

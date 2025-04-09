@@ -50,12 +50,14 @@ This project demonstrates a simple producer-consumer pattern for processing IMU 
 *   `--log-level, -l`: (Optional) The log level (trace, debug, info, warning, error, fatal). Default is `info`.
 *   `--data-source, -d`: (Optional) The source of the IMU data (random or csv). Default is `random`.
 *   `--csv-file, -c`: (Optional) The path to the CSV file when using the `csv` data source.
+*   `--enable-rt, -r`: (Optional) Enable real-time scheduling. Default is false.
 
 ### Consumer
 
 *   `--socket-path, -s`: (Required) The path to the Unix domain socket.
 *   `--log-level, -l`: (Optional) The log level (trace, debug, info, warning, error, fatal). Default is `info`.
 *   `--timeout, -t`: (Optional) Timeout in milliseconds to wait for data. Default is 1000.
+*   `--enable-rt, -r`: (Optional) Enable real-time scheduling. Default is false.
 
 ## Usage Examples
 
@@ -86,6 +88,26 @@ Consumer with custom timeout and debug logging:
 Producer with CSV file input:
 ```bash
 ./producer -s /tmp/imu_socket -f 50 -d csv -c /path/to/imu_data.csv --log-level debug
+```
+
+### Running with Real-time Priority
+
+When using the `--enable-rt` option, make sure you have the appropriate permissions:
+
+1. Add to `/etc/security/limits.conf`:
+```
+your_username    hard    rtprio    99
+your_username    soft    rtprio    99
+your_username    hard    memlock   unlimited
+your_username    soft    memlock   unlimited
+```
+
+2. Log out and log back in for changes to take effect
+
+Example usage:
+```bash
+sudo ./producer -s /tmp/imu_socket -f 100 --enable-rt
+sudo ./consumer -s /tmp/imu_socket --enable-rt
 ```
 
 ### CSV File Format
